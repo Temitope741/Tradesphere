@@ -132,7 +132,7 @@ export default function VendorDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${Math.round(stats.totalRevenue).toLocaleString()}
+                ₦{Math.round(stats.totalRevenue).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 All time earnings
@@ -283,7 +283,7 @@ export default function VendorDashboard() {
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Average Revenue/Order</span>
                   <span className="text-xl font-bold">
-                    ${stats.totalOrders > 0
+                    ₦{stats.totalOrders > 0
                       ? (stats.totalRevenue / stats.totalOrders).toFixed(2)
                       : '0.00'}
                   </span>

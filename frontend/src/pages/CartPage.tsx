@@ -184,7 +184,7 @@ export default function CartPage() {
                           by {item.product.vendor?.fullName || 'Unknown Vendor'}
                         </p>
                         <p className="text-lg font-bold text-primary">
-                          ${item.product.price.toLocaleString()}
+                          ₦{item.product.price.toLocaleString()}
                         </p>
                       </div>
 
@@ -238,7 +238,7 @@ export default function CartPage() {
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-semibold">${total.toLocaleString()}</span>
+                      <span className="font-semibold">₦{total.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Items</span>
@@ -251,7 +251,7 @@ export default function CartPage() {
                     <Separator />
                     <div className="flex justify-between text-lg">
                       <span className="font-bold">Total</span>
-                      <span className="font-bold text-primary">${total.toLocaleString()}</span>
+                      <span className="font-bold text-primary">₦{total.toLocaleString()}</span>
                     </div>
                   </div>
 

@@ -174,7 +174,7 @@ export default function WishlistPage() {
                     </h3>
                   </Link>
                   <p className="text-2xl font-bold text-primary mb-4">
-                    ${item.product.price.toLocaleString()}
+                    ₦{item.product.price.toLocaleString()}
                   </p>
                   
                   <div className="flex gap-2">

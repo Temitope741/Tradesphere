@@ -46,9 +46,9 @@ export default function VendorProducts() {
     imageUrl: '',
     sku: '',
   });
+  const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
-  const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -62,7 +62,7 @@ export default function VendorProducts() {
   const checkVendorAccess = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         navigate('/auth');
         return;
@@ -121,62 +121,49 @@ export default function VendorProducts() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast({
-        title: "Invalid file",
-        description: "Please select an image file.",
-        variant: "destructive",
+        title: "Invalid file type",
+        description: `${file.name} is not a valid image file`,
+        variant: "destructive"
       });
       return;
     }
 
+    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Image must be less than 5MB.",
-        variant: "destructive",
+        description: `${file.name} is too large. Maximum size is 5MB`,
+        variant: "destructive"
       });
       return;
     }
 
-    setImageFile(file);
+    // Read file and convert to Base64
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+    reader.onload = () => {
+      if (reader.result) {
+        setFormData({ ...formData, imageUrl: reader.result as string });
+        toast({
+          title: "Image loaded",
+          description: "Image preview ready"
+        });
+      }
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Upload error",
+        description: `Failed to read ${file.name}`,
+        variant: "destructive"
+      });
     };
     reader.readAsDataURL(file);
   };
-
-  const uploadImageToCloudinary = async (file: File): Promise<string> => {
-    setUploadingImage(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'ml_default');
-    const cloudName = 'demo'; // Replace with your Cloudinary cloud name
-
-    try {
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      if (!response.ok) throw new Error('Upload failed');
-      const data = await response.json();
-      setUploadingImage(false);
-      return data.secure_url;
-    } catch (error) {
-      setUploadingImage(false);
-      throw error;
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate category is selected
+
     if (!formData.category) {
       toast({
         title: "Category required",
@@ -189,30 +176,13 @@ export default function VendorProducts() {
     setLoading(true);
 
     try {
-      let imageUrl = formData.imageUrl;
-
-      if (imageFile) {
-        try {
-          imageUrl = await uploadImageToCloudinary(imageFile);
-          toast({ title: "Image uploaded successfully!" });
-        } catch (error) {
-          toast({
-            title: "Image upload failed",
-            description: "Failed to upload image. Please try again.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-      }
-
       const productData = {
         name: formData.name,
         description: formData.description,
         price: parseFloat(formData.price),
         stockQuantity: parseInt(formData.stockQuantity),
         category: formData.category,
-        imageUrl: imageUrl,
+        imageUrl: formData.imageUrl || '',
         sku: formData.sku,
       };
 
@@ -252,8 +222,6 @@ export default function VendorProducts() {
       imageUrl: product.imageUrl || '',
       sku: product.sku || '',
     });
-    setImagePreview(product.imageUrl || '');
-    setImageFile(null);
     setIsDialogOpen(true);
   };
 
@@ -288,8 +256,6 @@ export default function VendorProducts() {
       imageUrl: '',
       sku: '',
     });
-    setImageFile(null);
-    setImagePreview('');
   };
 
   return (
@@ -341,7 +307,7 @@ export default function VendorProducts() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="price">Price ($) *</Label>
+                    <Label htmlFor="price">Price (₦) *</Label>
                     <Input
                       id="price"
                       type="number"
@@ -420,23 +386,20 @@ export default function VendorProducts() {
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
-                    disabled={loading || uploadingImage}
+                    disabled={loading}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Max size: 5MB. Supported: JPG, PNG, WEBP
+                    Max size: 5MB. Supported: JPG, PNG, WEBP, GIF
                   </p>
-                  {imagePreview && (
+                  {formData.imageUrl && (
                     <div className="mt-3">
                       <p className="text-sm font-medium mb-2">Preview:</p>
-                      <img 
-                        src={imagePreview} 
-                        alt="Product preview" 
+                      <img
+                        src={formData.imageUrl}
+                        alt="Product preview"
                         className="h-32 w-32 object-cover rounded-lg border"
                       />
                     </div>
-                  )}
-                  {uploadingImage && (
-                    <p className="text-sm text-primary mt-2">Uploading image...</p>
                   )}
                 </div>
 
@@ -453,13 +416,13 @@ export default function VendorProducts() {
                     Cancel
                   </Button>
                   <Button type="submit" disabled={loading || uploadingImage}>
-                    {loading 
-                      ? 'Saving...' 
-                      : uploadingImage 
-                      ? 'Uploading Image...'
-                      : editingProduct 
-                      ? 'Update Product' 
-                      : 'Create Product'}
+                    {loading
+                      ? 'Saving...'
+                      : uploadingImage
+                        ? 'Uploading Image...'
+                        : editingProduct
+                          ? 'Update Product'
+                          : 'Create Product'}
                   </Button>
                 </div>
               </form>
@@ -514,7 +477,7 @@ export default function VendorProducts() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-xl font-bold text-primary">
-                        ${product.price.toLocaleString()}
+                        ₦{product.price.toLocaleString()}
                       </span>
                       <Badge variant="outline">{product.category?.name}</Badge>
                     </div>

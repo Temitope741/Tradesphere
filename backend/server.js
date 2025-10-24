@@ -25,19 +25,24 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// Middleware
 app.use(helmet()); // Security headers
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:8080',
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// ✅ Increase body size limit to handle Base64 image uploads
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
 app.use(cookieParser());
 app.use(morgan('dev')); // Logging
 
-// Database connection - FIXED: Removed deprecated options
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  family: 4, // Force IPv4 to avoid EAI_AGAIN DNS error
+})
 .then(() => console.log('✅ MongoDB Connected Successfully'))
 .catch((err) => {
   console.error('❌ MongoDB Connection Error:', err.message);
