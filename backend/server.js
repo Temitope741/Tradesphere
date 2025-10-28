@@ -6,7 +6,6 @@ const dotenv = require('dotenv');
 const helmet = require('helmet');
 const morgan = require('morgan');
 
-// Load environment variables
 dotenv.config();
 
 // Import routes
@@ -20,34 +19,46 @@ const reviewRoutes = require('./routes/review.routes');
 const wishlistRoutes = require('./routes/wishlist.routes');
 const vendorRoutes = require('./routes/vendor.routes');
 
-// Import error handler middleware
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-app.use(helmet()); // Security headers
+app.use(helmet());
+
+// ✅ FIXED CORS CONFIGURATION
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:8080',
+  'https://tradesphere-wr1e.onrender.com'
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'https://tradesphere-wr1e.onrender.com',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    const msg = 'CORS policy does not allow access from this origin.';
+    return callback(new Error(msg), false);
+  },
   credentials: true
 }));
 
-// ✅ Increase body size limit to handle Base64 image uploads
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
-
 app.use(cookieParser());
-app.use(morgan('dev')); // Logging
+app.use(morgan('dev'));
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  family: 4, // Force IPv4 to avoid EAI_AGAIN DNS error
-})
-.then(() => console.log('✅ MongoDB Connected Successfully'))
-.catch((err) => {
-  console.error('❌ MongoDB Connection Error:', err.message);
-  process.exit(1);
-});
+// ✅ FIXED MONGOOSE CONNECTION
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ MongoDB Connected Successfully'))
+  .catch((err) => {
+    console.error('❌ MongoDB Connection Error:', err.message);
+    process.exit(1);
+  });
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -77,7 +88,7 @@ app.use('*', (req, res) => {
   });
 });
 
-// Error handling middleware (must be last)
+// Error handling middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
@@ -87,7 +98,6 @@ app.listen(PORT, () => {
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('❌ Unhandled Rejection:', err.message);
   process.exit(1);
