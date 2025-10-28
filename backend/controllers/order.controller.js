@@ -9,24 +9,32 @@ const ApiResponse = require('../utils/ApiResponse');
 // @access  Private
 exports.createOrder = async (req, res, next) => {
   try {
-    const { items, shippingAddress, paymentMethod } = req.body;
-
-    if (!items || items.length === 0) {
-      return ApiResponse.error(res, 'No items in order', 400);
-    }
+    const { shippingAddress, phone, paymentMethod, paymentReference } = req.body;
 
     if (!shippingAddress) {
       return ApiResponse.error(res, 'Shipping address is required', 400);
+    }
+
+    if (!phone) {
+      return ApiResponse.error(res, 'Phone number is required', 400);
+    }
+
+    // Get cart
+    const cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
+    
+    if (!cart || cart.items.length === 0) {
+      return ApiResponse.error(res, 'Cart is empty', 400);
     }
 
     // Group items by vendor
     const vendorGroups = {};
     let totalAmount = 0;
 
-    for (const item of items) {
-      const product = await Product.findById(item.product);
+    for (const item of cart.items) {
+      const product = item.product;
+      
       if (!product || !product.isActive) {
-        return ApiResponse.error(res, `Product ${item.product} not found`, 404);
+        return ApiResponse.error(res, `Product ${item.product?._id} not available`, 404);
       }
 
       if (!product.isInStock(item.quantity)) {
@@ -40,13 +48,22 @@ exports.createOrder = async (req, res, next) => {
 
       const itemTotal = product.price * item.quantity;
       vendorGroups[vendorId].push({
-        product: item.product,
+        product: product._id,
         quantity: item.quantity,
         unitPrice: product.price,
         totalPrice: itemTotal
       });
 
       totalAmount += itemTotal;
+    }
+
+    // Determine payment status based on payment method
+    let paymentStatus = 'pending';
+    if (paymentMethod === 'card' && paymentReference) {
+      // For card payments, verify with Paystack
+      paymentStatus = 'paid'; // Will be verified in separate endpoint
+    } else if (paymentMethod === 'bank_transfer') {
+      paymentStatus = 'pending'; // Awaiting bank transfer confirmation
     }
 
     // Create orders for each vendor
@@ -60,7 +77,10 @@ exports.createOrder = async (req, res, next) => {
         items: vendorItems,
         totalAmount: vendorTotal,
         shippingAddress,
-        paymentMethod: paymentMethod || 'cash_on_delivery'
+        phone,
+        paymentMethod: paymentMethod || 'cash_on_delivery',
+        paymentStatus,
+        paymentReference: paymentReference || null
       });
 
       // Reduce stock for each product
@@ -72,13 +92,97 @@ exports.createOrder = async (req, res, next) => {
       orders.push(order);
     }
 
-    // Clear cart after order
+    // Clear cart after successful order
     await Cart.findOneAndUpdate(
       { user: req.user._id },
       { items: [] }
     );
 
     ApiResponse.success(res, orders, 'Order placed successfully', 201);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify Paystack payment
+// @route   POST /api/orders/verify-payment
+// @access  Private
+exports.verifyPayment = async (req, res, next) => {
+  try {
+    const { reference } = req.body;
+
+    if (!reference) {
+      return ApiResponse.error(res, 'Payment reference is required', 400);
+    }
+
+    // Verify payment with Paystack
+    const https = require('https');
+    const options = {
+      hostname: 'api.paystack.co',
+      port: 443,
+      path: `/transaction/verify/${reference}`,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+      }
+    };
+
+    const paystackReq = https.request(options, (paystackRes) => {
+      let data = '';
+
+      paystackRes.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      paystackRes.on('end', async () => {
+        const response = JSON.parse(data);
+
+        if (response.data.status === 'success') {
+          // Update order payment status
+          await Order.updateMany(
+            { paymentReference: reference },
+            { paymentStatus: 'paid' }
+          );
+
+          ApiResponse.success(res, response.data, 'Payment verified successfully');
+        } else {
+          ApiResponse.error(res, 'Payment verification failed', 400);
+        }
+      });
+    });
+
+    paystackReq.on('error', (error) => {
+      console.error('Paystack verification error:', error);
+      ApiResponse.error(res, 'Payment verification failed', 500);
+    });
+
+    paystackReq.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Confirm bank transfer
+// @route   PUT /api/orders/:id/confirm-transfer
+// @access  Private
+exports.confirmBankTransfer = async (req, res, next) => {
+  try {
+    const { transferReference } = req.body;
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return ApiResponse.error(res, 'Order not found', 404);
+    }
+
+    if (order.customer.toString() !== req.user._id.toString()) {
+      return ApiResponse.error(res, 'Not authorized', 403);
+    }
+
+    order.paymentReference = transferReference;
+    order.paymentStatus = 'pending'; // Admin will verify
+    await order.save();
+
+    ApiResponse.success(res, order, 'Bank transfer details submitted. Awaiting verification.');
   } catch (error) {
     next(error);
   }
@@ -114,7 +218,6 @@ exports.getOrder = async (req, res, next) => {
       return ApiResponse.error(res, 'Order not found', 404);
     }
 
-    // Check if user is customer or vendor of this order
     if (
       order.customer._id.toString() !== req.user._id.toString() &&
       order.vendor._id.toString() !== req.user._id.toString() &&
@@ -146,7 +249,6 @@ exports.updateOrderStatus = async (req, res, next) => {
       return ApiResponse.error(res, 'Order not found', 404);
     }
 
-    // Check if user is the vendor of this order
     if (order.vendor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return ApiResponse.error(res, 'Not authorized', 403);
     }

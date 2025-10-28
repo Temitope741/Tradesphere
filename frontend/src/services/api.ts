@@ -48,17 +48,19 @@ class ApiClient {
     }
   }
 
-  // Auth Methods
+  // ===============================
+  // AUTH METHODS
+  // ===============================
   async register(userData: any) {
     const response = await this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
-    
+
     if (response.token) {
       this.setToken(response.token);
     }
-    
+
     return response;
   }
 
@@ -67,11 +69,11 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    
+
     if (response.token) {
       this.setToken(response.token);
     }
-    
+
     return response;
   }
 
@@ -84,7 +86,9 @@ class ApiClient {
     return this.request('/auth/me');
   }
 
-  // Product Methods
+  // ===============================
+  // PRODUCT METHODS
+  // ===============================
   async getProducts(params: any = {}) {
     const queryString = new URLSearchParams(params).toString();
     return this.request(`/products${queryString ? '?' + queryString : ''}`);
@@ -94,12 +98,16 @@ class ApiClient {
     return this.request(`/products/${id}`);
   }
 
-  // Category Methods
+  // ===============================
+  // CATEGORY METHODS
+  // ===============================
   async getCategories() {
     return this.request('/categories');
   }
 
-  // Cart Methods
+  // ===============================
+  // CART METHODS
+  // ===============================
   async getCart() {
     return this.request('/cart');
   }
@@ -130,7 +138,9 @@ class ApiClient {
     });
   }
 
-  // Order Methods
+  // ===============================
+  // ORDER METHODS (Updated)
+  // ===============================
   async createOrder(orderData: any) {
     return this.request('/orders', {
       method: 'POST',
@@ -142,7 +152,24 @@ class ApiClient {
     return this.request('/orders');
   }
 
-  // Review Methods
+  // 💳 PAYMENT METHODS
+  async verifyPayment(reference: string) {
+    return this.request('/orders/verify-payment', {
+      method: 'POST',
+      body: JSON.stringify({ reference }),
+    });
+  }
+
+  async confirmBankTransfer(orderId: string, transferReference: string) {
+    return this.request(`/orders/${orderId}/confirm-transfer`, {
+      method: 'PUT',
+      body: JSON.stringify({ transferReference }),
+    });
+  }
+
+  // ===============================
+  // REVIEW METHODS
+  // ===============================
   async getProductReviews(productId: string) {
     return this.request(`/reviews/product/${productId}`);
   }
@@ -154,7 +181,9 @@ class ApiClient {
     });
   }
 
-  // Wishlist Methods
+  // ===============================
+  // WISHLIST METHODS
+  // ===============================
   async getWishlist() {
     return this.request('/wishlist');
   }
@@ -172,7 +201,9 @@ class ApiClient {
     });
   }
 
-  // Vendor Methods
+  // ===============================
+  // VENDOR METHODS
+  // ===============================
   async getVendorDashboard() {
     return this.request('/vendor/dashboard');
   }
@@ -187,7 +218,9 @@ class ApiClient {
     return this.request(`/vendor/orders${queryString ? '?' + queryString : ''}`);
   }
 
-  // User Profile
+  // ===============================
+  // USER PROFILE
+  // ===============================
   async getProfile() {
     return this.request('/users/profile');
   }
@@ -199,7 +232,9 @@ class ApiClient {
     });
   }
 
-  // Product Management (Vendor)
+  // ===============================
+  // PRODUCT MANAGEMENT (Vendor)
+  // ===============================
   async createProduct(productData: any) {
     return this.request('/products', {
       method: 'POST',
