@@ -27,7 +27,7 @@ const app = express();
 
 app.use(helmet()); // Security headers
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:8080',
+  origin: process.env.CLIENT_URL || 'https://tradesphere-wr1e.onrender.com',
   credentials: true
 }));
 
