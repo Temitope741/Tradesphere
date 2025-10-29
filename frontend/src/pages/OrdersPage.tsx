@@ -180,11 +180,11 @@ export default function OrdersPage() {
                           <div className="flex-1">
                             <p className="font-semibold">{item.product.name}</p>
                             <p className="text-sm text-muted-foreground">
-                              Quantity: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                              Quantity: {item.quantity} × ₦{item.unitPrice.toFixed(2)}
                             </p>
                           </div>
                           <p className="font-semibold">
-                            ${item.totalPrice.toLocaleString()}
+                            ₦{item.totalPrice.toLocaleString()}
                           </p>
                         </div>
                       ))}
@@ -225,7 +225,7 @@ export default function OrdersPage() {
                       <div className="flex justify-between text-lg font-bold pt-2 border-t">
                         <span>Total:</span>
                         <span className="text-primary">
-                          ${order.totalAmount.toLocaleString()}
+                          ₦{order.totalAmount.toLocaleString()}
                         </span>
                       </div>
                     </div>

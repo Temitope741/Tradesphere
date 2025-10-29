@@ -26,7 +26,7 @@ export const Footer = () => {
               </div>
               <div className="flex items-center space-x-2 text-muted-foreground">
                 <MapPin className="h-4 w-4" />
-                <span>123 Commerce St, Business District</span>
+                <span>123 Glover St, Business District</span>
               </div>
             </div>
           </div>
@@ -110,7 +110,7 @@ export const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 TradeSphere. All rights reserved. Built by Micheal Glover.</p>
+          <p>&copy; 2025 TradeSphere. All rights reserved. Built by Micheal Glover.</p>
         </div>
       </div>
     </footer>

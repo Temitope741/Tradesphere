@@ -299,7 +299,7 @@ export default function ProductDetailPage() {
             </div>
 
             <div className="text-4xl font-bold text-primary mb-6">
-              ${product.price.toLocaleString()}
+              ₦{product.price.toLocaleString()}
             </div>
 
             <p className="text-muted-foreground mb-6 leading-relaxed">

@@ -230,7 +230,7 @@ export default function HomePage() {
                   
                   <div className="flex justify-between items-center">
                     <span className="text-2xl font-bold text-primary">
-                      ${product.price}
+                      ₦{product.price}
                     </span>
                     <div className="flex items-center space-x-1">
                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />

@@ -404,7 +404,7 @@ export default function CheckoutPage() {
 
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                           <p className="text-sm font-medium text-amber-800">
-                            ⚠️ Amount to Transfer: ${total.toLocaleString()}
+                            ⚠️ Amount to Transfer: ₦{total.toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -445,7 +445,7 @@ export default function CheckoutPage() {
                         {item.product.name} × {item.quantity}
                       </span>
                       <span className="font-semibold">
-                        ${(item.product.price * item.quantity).toLocaleString()}
+                        ₦{(item.product.price * item.quantity).toLocaleString()}
                       </span>
                     </div>
                   ))}
@@ -454,7 +454,7 @@ export default function CheckoutPage() {
 
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-semibold">${total.toLocaleString()}</span>
+                    <span className="font-semibold">₦{total.toLocaleString()}</span>
                   </div>
 
                   <div className="flex justify-between">
