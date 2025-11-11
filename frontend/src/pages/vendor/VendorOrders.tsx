@@ -4,15 +4,9 @@ import api from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Package, Clock, CheckCircle, XCircle, Truck, CreditCard, Phone, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Clock, CheckCircle, XCircle, Truck, CreditCard, CheckCheck } from 'lucide-react';
 
 interface OrderItem {
   _id: string;
@@ -30,9 +24,10 @@ interface Order {
   _id: string;
   orderNumber: string;
   customer: {
+    _id: string;
     fullName: string;
     email: string;
-    phone?: string;
+    phone: string;
   };
   items: OrderItem[];
   totalAmount: number;
@@ -49,13 +44,16 @@ interface Order {
 export default function VendorOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [paymentFilter, setPaymentFilter] = useState<string>('all');
+  const [approvingPayment, setApprovingPayment] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [statusFilter, paymentFilter]);
 
   const fetchOrders = async () => {
     try {
@@ -66,9 +64,15 @@ export default function VendorOrdersPage() {
         return;
       }
 
-      const response = await api.getVendorOrders();
-      if (response.success) {
-        setOrders(response.data);
+      const params: any = {};
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (paymentFilter !== 'all') params.paymentStatus = paymentFilter;
+
+      const response = await api.getVendorOrders(params);
+      
+      // ✅ FIX: Access the nested data property
+      if (response.success && response.data) {
+        setOrders(response.data.data || []); // response.data.data because backend returns { data: { data: orders } }
       }
     } catch (error: any) {
       console.error('Error fetching orders:', error);
@@ -77,7 +81,7 @@ export default function VendorOrdersPage() {
       } else {
         toast({
           title: "Error",
-          description: "Failed to fetch orders",
+          description: "Failed to fetch orders. Please try again.",
           variant: "destructive",
         });
       }
@@ -86,53 +90,65 @@ export default function VendorOrdersPage() {
     }
   };
 
-  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
-    setUpdatingOrder(orderId);
+  const handleApprovePayment = async (orderId: string) => {
+    setApprovingPayment(orderId);
+    
     try {
-      const response = await api.updateOrderStatus(orderId, newStatus);
+      const response = await api.approvePayment(orderId);
+      
       if (response.success) {
         toast({
-          title: "Success",
-          description: "Order status updated successfully",
+          title: "Payment Approved",
+          description: "Payment has been approved successfully.",
         });
-        // Update local state
+        
+        // Update the order in the local state
         setOrders(orders.map(order => 
-          order._id === orderId ? { ...order, status: newStatus } : order
+          order._id === orderId 
+            ? { ...order, paymentStatus: 'approved' }
+            : order
         ));
       }
     } catch (error: any) {
+      console.error('Error approving payment:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update order status",
+        description: error.message || "Failed to approve payment. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setUpdatingOrder(null);
+      setApprovingPayment(null);
     }
   };
 
-  const handleApprovePayment = async (orderId: string) => {
-    setUpdatingOrder(orderId);
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(orderId);
+    
     try {
-      const response = await api.approvePayment(orderId);
+      const response = await api.updateOrderStatus(orderId, newStatus);
+      
       if (response.success) {
         toast({
-          title: "Payment Approved!",
-          description: "The customer will see the payment as approved.",
+          title: "Status Updated",
+          description: `Order status updated to ${newStatus}.`,
         });
-        // Update local state
+        
+        // Update the order in the local state
         setOrders(orders.map(order => 
-          order._id === orderId ? { ...order, paymentStatus: 'approved' } : order
+          order._id === orderId 
+            ? { ...order, status: newStatus }
+            : order
         ));
       }
     } catch (error: any) {
+      console.error('Error updating status:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to approve payment",
+        description: error.message || "Failed to update status. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setUpdatingOrder(null);
+      setUpdatingStatus(null);
     }
   };
 
@@ -214,51 +230,102 @@ export default function VendorOrdersPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-4xl font-bold">Vendor Orders</h1>
-          <p className="text-muted-foreground mt-2">Manage your orders and approve payments</p>
+          
+          <div className="flex gap-4">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="shipped">Shipped</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Payments</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {orders.length === 0 ? (
           <div className="text-center py-16">
             <Package className="h-24 w-24 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold mb-2">No orders yet</h2>
-            <p className="text-muted-foreground mb-6">Your orders will appear here</p>
+            <h2 className="text-2xl font-semibold mb-2">No orders found</h2>
+            <p className="text-muted-foreground">Orders from customers will appear here</p>
           </div>
         ) : (
           <div className="space-y-6">
             {orders.map((order) => (
               <Card key={order._id}>
                 <CardHeader>
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-lg">
-                        Order #{order.orderNumber || order._id.slice(-8)}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {new Date(order.createdAt).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                      <p className="text-sm font-semibold mt-1">
-                        Customer: {order.customer?.fullName || 'Unknown'}
-                      </p>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-lg">
+                          Order #{order.orderNumber || order._id.slice(-8)}
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {new Date(order.createdAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={getStatusVariant(order.status)}>
+                          {getStatusIcon(order.status)}
+                          <span className="ml-1 capitalize">{order.status}</span>
+                        </Badge>
+                        {getPaymentStatusBadge(order.paymentStatus)}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={getStatusVariant(order.status)}>
-                        {getStatusIcon(order.status)}
-                        <span className="ml-1 capitalize">{order.status}</span>
-                      </Badge>
-                      {getPaymentStatusBadge(order.paymentStatus)}
+
+                    {/* Customer Information - NEW */}
+                    <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold">Customer:</span>
+                        <span>{order.customer?.fullName || 'Unknown'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-semibold">Phone:</span>
+                        <a 
+                          href={`tel:${order.phone || order.customer?.phone}`}
+                          className="text-primary hover:underline"
+                        >
+                          {order.phone || order.customer?.phone || 'N/A'}
+                        </a>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Package className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <span className="font-semibold">Address:</span>
+                        <span className="flex-1">{order.shippingAddress}</span>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
+
                 <CardContent>
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Order Items */}
                     <div className="space-y-3">
                       {order.items.map((item) => (
@@ -291,91 +358,75 @@ export default function VendorOrdersPage() {
 
                     {/* Order Details */}
                     <div className="border-t pt-4 space-y-2">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Customer Email</p>
-                          <p className="font-semibold">{order.customer?.email || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Customer Phone</p>
-                          <p className="font-semibold">{order.phone || 'N/A'}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-muted-foreground">Shipping Address</p>
-                          <p className="font-semibold">{order.shippingAddress}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Payment Method</p>
-                          <p className="font-semibold capitalize">
-                            {order.paymentMethod?.replace(/_/g, ' ') || 'N/A'}
-                          </p>
-                        </div>
-                        {order.paymentReference && (
-                          <div>
-                            <p className="text-sm text-muted-foreground">Payment Reference</p>
-                            <p className="font-mono text-sm font-semibold">{order.paymentReference}</p>
-                          </div>
-                        )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Payment Method:</span>
+                        <span className="font-semibold capitalize">
+                          {order.paymentMethod?.replace(/_/g, ' ') || 'N/A'}
+                        </span>
                       </div>
+                      
+                      {order.paymentReference && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Payment Reference:</span>
+                          <span className="font-mono text-sm">{order.paymentReference}</span>
+                        </div>
+                      )}
 
+                      {order.trackingNumber && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Tracking:</span>
+                          <span className="font-mono text-sm">{order.trackingNumber}</span>
+                        </div>
+                      )}
+                      
                       <div className="flex justify-between text-lg font-bold pt-2 border-t">
                         <span>Total:</span>
-                        <span className="text-primary">₦{order.totalAmount.toLocaleString()}</span>
+                        <span className="text-primary">
+                          ₦{order.totalAmount.toLocaleString()}
+                        </span>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="border-t pt-4 flex flex-col sm:flex-row gap-4">
-                      <div className="flex-1">
-                        <label className="text-sm font-medium mb-2 block">Update Order Status</label>
-                        <Select
-                          value={order.status}
-                          onValueChange={(value) => handleStatusUpdate(order._id, value)}
-                          disabled={updatingOrder === order._id}
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                      {/* Approve Payment Button - NEW */}
+                      {order.paymentStatus === 'pending' && order.paymentMethod === 'bank_transfer' && (
+                        <Button
+                          onClick={() => handleApprovePayment(order._id)}
+                          disabled={approvingPayment === order._id}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
                         >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="processing">Processing</SelectItem>
-                            <SelectItem value="shipped">Shipped</SelectItem>
-                            <SelectItem value="delivered">Delivered</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      Approve Payment Button
-                      {order.paymentStatus === 'pending' && (
-                        <div className="flex-1 flex items-end">
-                          <Button
-                            onClick={() => handleApprovePayment(order._id)}
-                            disabled={updatingOrder === order._id}
-                            className="w-full bg-green-600 hover:bg-green-700"
-                          >
-                            {updatingOrder === order._id ? (
-                              <>Processing...</>
-                            ) : (
-                              <>
-                                <CheckCheck className="h-4 w-4 mr-2" />
-                                Approve Payment
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-
-                      {order.paymentStatus === 'approved' && (
-                        <div className="flex-1 flex items-end">
-                          <div className="w-full p-3 bg-green-50 border border-green-200 rounded-lg text-center">
-                            <p className="text-green-700 font-semibold flex items-center justify-center">
+                          {approvingPayment === order._id ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                              Approving...
+                            </>
+                          ) : (
+                            <>
                               <CheckCircle className="h-4 w-4 mr-2" />
-                              Payment Approved
-                            </p>
-                          </div>
-                        </div>
+                              Approve Payment
+                            </>
+                          )}
+                        </Button>
                       )}
+
+                      {/* Update Status */}
+                      <Select
+                        value={order.status}
+                        onValueChange={(value) => handleStatusUpdate(order._id, value)}
+                        disabled={updatingStatus === order._id}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="processing">Processing</SelectItem>
+                          <SelectItem value="shipped">Shipped</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </CardContent>

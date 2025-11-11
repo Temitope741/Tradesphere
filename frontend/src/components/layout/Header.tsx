@@ -107,7 +107,7 @@ export const Header = ({ cartItemCount = 0 }: HeaderProps) => {
             className="flex items-center space-x-2 font-bold text-lg sm:text-xl text-primary hover:opacity-80 transition-opacity flex-shrink-0"
           >
             <Package className="h-6 w-6 sm:h-8 sm:w-8" />
-            <span className="hidden xs:inline">TradeSphere</span>
+            <span className=" xs:inline">TradeSphere</span>
           </Link>
 
           {/* Desktop Search Bar */}
