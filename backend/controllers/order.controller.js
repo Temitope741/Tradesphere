@@ -60,10 +60,11 @@ exports.createOrder = async (req, res, next) => {
     // Determine payment status based on payment method
     let paymentStatus = 'pending';
     if (paymentMethod === 'card' && paymentReference) {
-      // For card payments, verify with Paystack
-      paymentStatus = 'paid'; // Will be verified in separate endpoint
+      paymentStatus = 'paid';
     } else if (paymentMethod === 'bank_transfer') {
-      paymentStatus = 'pending'; // Awaiting bank transfer confirmation
+      paymentStatus = 'pending';
+    } else if (paymentMethod === 'cash_on_delivery') {
+      paymentStatus = 'pending';
     }
 
     // Create orders for each vendor
@@ -138,7 +139,6 @@ exports.verifyPayment = async (req, res, next) => {
         const response = JSON.parse(data);
 
         if (response.data.status === 'success') {
-          // Update order payment status
           await Order.updateMany(
             { paymentReference: reference },
             { paymentStatus: 'paid' }
@@ -179,11 +179,57 @@ exports.confirmBankTransfer = async (req, res, next) => {
     }
 
     order.paymentReference = transferReference;
-    order.paymentStatus = 'pending'; // Admin will verify
+    order.paymentStatus = 'pending';
     await order.save();
 
     ApiResponse.success(res, order, 'Bank transfer details submitted. Awaiting verification.');
   } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Approve payment (Vendor)
+// @route   PUT /api/orders/:id/approve-payment
+// @access  Private (Vendor only)
+exports.approvePayment = async (req, res, next) => {
+  try {
+    console.log('Approve payment called for order:', req.params.id);
+    console.log('User:', req.user._id);
+
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      console.log('Order not found');
+      return ApiResponse.error(res, 'Order not found', 404);
+    }
+
+    console.log('Order vendor:', order.vendor.toString());
+    console.log('Request user:', req.user._id.toString());
+
+    // Check if user is the vendor for this order or admin
+    if (order.vendor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      console.log('Not authorized');
+      return ApiResponse.error(res, 'Not authorized to approve this payment', 403);
+    }
+
+    // Check if payment is already approved
+    if (order.paymentStatus === 'approved') {
+      return ApiResponse.error(res, 'Payment already approved', 400);
+    }
+
+    // Update payment status
+    order.paymentStatus = 'approved';
+    await order.save();
+
+    console.log('Payment approved successfully');
+
+    // Populate order details for response
+    await order.populate('customer', 'fullName email phone');
+    await order.populate('items.product', 'name imageUrl');
+
+    ApiResponse.success(res, order, 'Payment approved successfully');
+  } catch (error) {
+    console.error('Error in approvePayment:', error);
     next(error);
   }
 };
@@ -261,3 +307,25 @@ exports.updateOrderStatus = async (req, res, next) => {
     next(error);
   }
 };
+// // At the VERY END of your order.controller.js file, 
+// // make sure you have ALL these exports:
+
+// // You should see these exports at the bottom:
+// exports.createOrder = async (req, res, next) => { /* ... */ };
+// exports.verifyPayment = async (req, res, next) => { /* ... */ };
+// exports.confirmBankTransfer = async (req, res, next) => { /* ... */ };
+// exports.approvePayment = async (req, res, next) => { /* ... */ };  // ⚠️ THIS MUST BE HERE!
+// exports.getMyOrders = async (req, res, next) => { /* ... */ };
+// exports.getOrder = async (req, res, next) => { /* ... */ };
+// exports.updateOrderStatus = async (req, res, next) => { /* ... */ };
+
+// // OR if you have module.exports at the end, it should look like:
+// module.exports = {
+//   createOrder,
+//   verifyPayment,
+//   confirmBankTransfer,
+//   approvePayment,  // ⚠️ THIS MUST BE HERE!
+//   getMyOrders,
+//   getOrder,
+//   updateOrderStatus
+// };

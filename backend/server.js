@@ -52,6 +52,12 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
+// 🔍 DEBUG MIDDLEWARE - Log all requests
+app.use((req, res, next) => {
+  console.log(`🌐 ${req.method} ${req.path}`);
+  next();
+});
+
 // ✅ FIXED MONGOOSE CONNECTION
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB Connected Successfully'))
@@ -70,21 +76,34 @@ app.get('/api/health', (req, res) => {
 });
 
 // API Routes
+console.log('📋 Registering routes...');
 app.use('/api/auth', authRoutes);
+console.log('✅ Auth routes registered');
 app.use('/api/users', userRoutes);
+console.log('✅ User routes registered');
 app.use('/api/products', productRoutes);
+console.log('✅ Product routes registered');
 app.use('/api/categories', categoryRoutes);
+console.log('✅ Category routes registered');
 app.use('/api/cart', cartRoutes);
+console.log('✅ Cart routes registered');
 app.use('/api/orders', orderRoutes);
+console.log('✅ Order routes registered');
 app.use('/api/reviews', reviewRoutes);
+console.log('✅ Review routes registered');
 app.use('/api/wishlist', wishlistRoutes);
+console.log('✅ Wishlist routes registered');
 app.use('/api/vendor', vendorRoutes);
+console.log('✅ Vendor routes registered');
 
 // 404 handler
 app.use('*', (req, res) => {
+  console.log('❌ 404 - Route not found:', req.method, req.originalUrl);
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: 'Route not found',
+    path: req.originalUrl,
+    method: req.method
   });
 });
 
@@ -96,6 +115,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 API URL: http://localhost:${PORT}/api`);
 });
 
 process.on('unhandledRejection', (err) => {

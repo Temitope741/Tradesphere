@@ -139,7 +139,7 @@ class ApiClient {
   }
 
   // ===============================
-  // ORDER METHODS (Updated)
+  // ORDER METHODS
   // ===============================
   async createOrder(orderData: any) {
     return this.request('/orders', {
@@ -164,6 +164,14 @@ class ApiClient {
     return this.request(`/orders/${orderId}/confirm-transfer`, {
       method: 'PUT',
       body: JSON.stringify({ transferReference }),
+    });
+  }
+
+  // ✅ APPROVE PAYMENT METHOD - THIS WAS MISSING!
+  async approvePayment(orderId: string) {
+    console.log('API: Approving payment for order:', orderId);
+    return this.request(`/orders/${orderId}/approve-payment`, {
+      method: 'PUT',
     });
   }
 

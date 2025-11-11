@@ -47,15 +47,24 @@ const orderSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Shipping address is required']
   },
+  phone: {
+    type: String,
+    required: [true, 'Phone number is required'],
+    trim: true
+  },
   paymentStatus: {
     type: String,
-    enum: ['pending', 'paid', 'failed', 'refunded'],
+    enum: ['pending', 'paid', 'approved', 'failed', 'refunded'],
     default: 'pending'
   },
   paymentMethod: {
     type: String,
     enum: ['cash_on_delivery', 'bank_transfer', 'card', 'paystack', 'stripe'],
     default: 'cash_on_delivery'
+  },
+  paymentReference: {
+    type: String,
+    trim: true
   },
   trackingNumber: {
     type: String,

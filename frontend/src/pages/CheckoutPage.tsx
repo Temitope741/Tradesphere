@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,8 @@ interface CartItem {
 
 interface Cart {
   items: CartItem[];
-  totalAmount: number;
+  totalAmount?: number;
+  totalPrice?: number;
 }
 
 type PaymentMethod = 'cash_on_delivery' | 'bank_transfer' | 'card';
@@ -77,6 +78,23 @@ export default function CheckoutPage() {
     }
   };
 
+  // Calculate totals from cart items (real-time calculation)
+  const { subtotal, totalItems } = useMemo(() => {
+    const cartItems = cart?.items || [];
+    
+    const subtotal = cartItems.reduce((sum, item) => {
+      return sum + (item.product.price * item.quantity);
+    }, 0);
+    
+    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    
+    return { subtotal, totalItems };
+  }, [cart?.items]);
+
+  // Use backend calculated total if available, otherwise use frontend calculation
+  const total = cart?.totalAmount || cart?.totalPrice || subtotal;
+  const cartItems = cart?.items || [];
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -103,7 +121,7 @@ export default function CheckoutPage() {
     const handler = PaystackPop.setup({
       key: 'pk_test_f7754f4152a7f87bb6234371ce9465a2aa232c99', // Replace with your Paystack public key
       email: localStorage.getItem('userEmail') || 'customer@example.com',
-      amount: (cart?.totalAmount || 0) * 100, // Amount in kobo
+      amount: total * 100, // Amount in kobo
       currency: 'NGN',
       ref: '' + Math.floor((Math.random() * 1000000000) + 1),
       callback: function(response: any) {
@@ -240,9 +258,6 @@ export default function CheckoutPage() {
     );
   }
 
-  const total = cart?.totalAmount || 0;
-  const cartItems = cart?.items || [];
-
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -258,10 +273,10 @@ export default function CheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="address">Shipping Address *</Label>
+                  <Label htmlFor="address">Delivery Address *</Label>
                   <Textarea
                     id="address"
-                    placeholder="Enter your full shipping address (street, city, state, postal code)..."
+                    placeholder="Enter your full delivery address (street, city, state, postal code)..."
                     value={shippingAddress}
                     onChange={(e) => setShippingAddress(e.target.value)}
                     rows={4}
@@ -454,24 +469,24 @@ export default function CheckoutPage() {
 
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-semibold">₦{total.toLocaleString()}</span>
+                    <span className="font-semibold">₦{subtotal.toLocaleString()}</span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Items</span>
-                    <span className="font-semibold">{cartItems.length}</span>
+                    <span className="font-semibold">{totalItems} {totalItems === 1 ? 'item' : 'items'}</span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Shipping</span>
-                    <span className="font-semibold text-green-600">Free</span>
+                    <span className="text-muted-foreground">Delivery fee</span>
+                    <span className="font-semibold text-green-600">Pay on delivery</span>
                   </div>
 
                   <Separator />
 
                   <div className="flex justify-between text-lg">
                     <span className="font-bold">Total</span>
-                    <span className="font-bold text-primary">${total.toLocaleString()}</span>
+                    <span className="font-bold text-primary">₦{total.toLocaleString()}</span>
                   </div>
                 </div>
 

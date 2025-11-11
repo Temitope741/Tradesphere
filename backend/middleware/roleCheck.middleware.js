@@ -1,57 +1,45 @@
-exports.authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized'
-      });
-    }
+// middleware/roleCheck.middleware.js
 
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `User role '${req.user.role}' is not authorized to access this route`
-      });
-    }
-
-    next();
-  };
-};
-
-// Check if user is vendor
+// Check if user is a vendor
 exports.isVendor = (req, res, next) => {
-  if (!req.user || req.user.role !== 'vendor') {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied. Vendor role required.'
-    });
+  console.log('🔐 Checking vendor role for user:', req.user?.email, 'Role:', req.user?.role);
+  
+  if (req.user && (req.user.role === 'vendor' || req.user.role === 'admin')) {
+    console.log('✅ User is vendor/admin');
+    return next();
   }
-  next();
+  
+  console.log('❌ User is not vendor/admin');
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Vendor role required.'
+  });
 };
 
 // Check if user is admin
 exports.isAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({
-      success: false,
-      message: 'Access denied. Admin role required.'
-    });
+  console.log('🔐 Checking admin role for user:', req.user?.email, 'Role:', req.user?.role);
+  
+  if (req.user && req.user.role === 'admin') {
+    console.log('✅ User is admin');
+    return next();
   }
-  next();
+  
+  console.log('❌ User is not admin');
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Admin role required.'
+  });
 };
 
-// Check if user owns the resource
-exports.isOwner = (field = 'userId') => {
-  return (req, res, next) => {
-    const resourceOwnerId = req.params[field] || req.body[field];
-    
-    if (!req.user || req.user._id.toString() !== resourceOwnerId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You do not own this resource.'
-      });
-    }
-    
-    next();
-  };
+// Check if user is customer
+exports.isCustomer = (req, res, next) => {
+  if (req.user && req.user.role === 'customer') {
+    return next();
+  }
+  
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Customer role required.'
+  });
 };

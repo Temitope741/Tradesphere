@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,9 @@ interface CartItem {
 interface Cart {
   _id: string;
   items: CartItem[];
-  totalAmount: number;
+  totalAmount?: number;
+  totalPrice?: number;
+  totalItems?: number;
 }
 
 export default function CartPage() {
@@ -126,7 +128,26 @@ export default function CartPage() {
     }
   };
 
-  const total = cart?.totalAmount || 0;
+  // Calculate totals from cart items (real-time calculation as backup)
+  const { subtotal, totalItems, itemSubtotals } = useMemo(() => {
+    const cartItems = cart?.items || [];
+    
+    const itemSubtotals = cartItems.map(item => ({
+      id: item.product._id,
+      subtotal: item.product.price * item.quantity
+    }));
+    
+    const subtotal = cartItems.reduce((sum, item) => {
+      return sum + (item.product.price * item.quantity);
+    }, 0);
+    
+    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    
+    return { subtotal, totalItems, itemSubtotals };
+  }, [cart?.items]);
+
+  // Use backend calculated total if available, otherwise use frontend calculation
+  const total = cart?.totalAmount || cart?.totalPrice || subtotal;
   const cartItems = cart?.items || [];
 
   if (loading) {
@@ -160,73 +181,83 @@ export default function CartPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item) => (
-                <Card key={item._id}>
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="w-full sm:w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        {item.product.imageUrl ? (
-                          <img
-                            src={item.product.imageUrl}
-                            alt={item.product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ShoppingBag className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-1">{item.product.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          by {item.product.vendor?.fullName || 'Unknown Vendor'}
-                        </p>
-                        <p className="text-lg font-bold text-primary">
-                          ₦{item.product.price.toLocaleString()}
-                        </p>
-                      </div>
-
-                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-4">
-                        <div className="flex items-center border rounded-lg">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => updateQuantity(item.product._id, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="px-4 font-semibold">{item.quantity}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
-                            disabled={item.quantity >= item.product.stockQuantity}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+              {cartItems.map((item) => {
+                const itemSubtotal = itemSubtotals.find(s => s.id === item.product._id)?.subtotal || 0;
+                
+                return (
+                  <Card key={item._id}>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="w-full sm:w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                          {item.product.imageUrl ? (
+                            <img
+                              src={item.product.imageUrl}
+                              alt={item.product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ShoppingBag className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(item.product._id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg mb-1">{item.product.name}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            by {item.product.vendor?.fullName || 'Unknown Vendor'}
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <p className="text-lg font-bold text-primary">
+                              ₦{item.product.price.toLocaleString()}
+                            </p>
+                            <span className="text-sm text-muted-foreground">× {item.quantity}</span>
+                          </div>
+                          <p className="text-sm font-semibold mt-1">
+                            Subtotal: ₦{itemSubtotal.toLocaleString()}
+                          </p>
+                        </div>
 
-                    {item.quantity >= item.product.stockQuantity && (
-                      <div className="mt-2 text-sm text-orange-500">
-                        Maximum stock reached
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-4">
+                          <div className="flex items-center border rounded-lg">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => updateQuantity(item.product._id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="px-4 font-semibold">{item.quantity}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
+                              disabled={item.quantity >= item.product.stockQuantity}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.product._id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+
+                      {item.quantity >= item.product.stockQuantity && (
+                        <div className="mt-2 text-sm text-orange-500">
+                          Maximum stock reached
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Order Summary */}
@@ -238,15 +269,15 @@ export default function CartPage() {
                   <div className="space-y-3 mb-6">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-semibold">₦{total.toLocaleString()}</span>
+                      <span className="font-semibold">₦{subtotal.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Items</span>
-                      <span className="font-semibold">{cartItems.length}</span>
+                      <span className="font-semibold">{totalItems} {totalItems === 1 ? 'item' : 'items'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Shipping</span>
-                      <span className="font-semibold">Free</span>
+                      <span className="text-muted-foreground">Delivery Fee</span>
+                      <span className="font-semibold text-green-600">pending confirmation</span>
                     </div>
                     <Separator />
                     <div className="flex justify-between text-lg">
@@ -259,8 +290,9 @@ export default function CartPage() {
                     className="w-full"
                     size="lg"
                     onClick={() => navigate('/checkout')}
+                    disabled={cartItems.length === 0}
                   >
-                    Proceed to Checkout
+                    Proceed to Checkout ({totalItems} {totalItems === 1 ? 'item' : 'items'})
                   </Button>
 
                   <Button

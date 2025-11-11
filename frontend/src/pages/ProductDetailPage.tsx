@@ -106,7 +106,7 @@ export default function ProductDetailPage() {
   const toggleWishlist = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         toast({
           title: "Authentication required",
@@ -149,7 +149,7 @@ export default function ProductDetailPage() {
   const addToCart = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         toast({
           title: "Authentication required",
@@ -180,7 +180,7 @@ export default function ProductDetailPage() {
   const submitReview = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         toast({
           title: "Authentication required",
@@ -201,19 +201,19 @@ export default function ProductDetailPage() {
       }
 
       const response = await api.createReview({
-        product: id,
+        productId: id,  // ✅ FIXED
         rating: newReview.rating,
         comment: newReview.comment,
       });
 
       if (response.success) {
-        toast({ 
-          title: "Review submitted", 
-          description: "Thank you for your feedback!" 
+        toast({
+          title: "Review submitted",
+          description: "Thank you for your feedback!"
         });
         setNewReview({ rating: 5, comment: '' });
         fetchReviews();
-        fetchProduct(); // Refresh to update average rating
+        fetchProduct();
       }
     } catch (error: any) {
       toast({
@@ -223,6 +223,7 @@ export default function ProductDetailPage() {
       });
     }
   };
+
 
   if (loading) {
     return (
@@ -276,8 +277,8 @@ export default function ProductDetailPage() {
                   by {product.vendor?.fullName || 'Unknown Vendor'}
                 </p>
               </div>
-              <Button 
-                variant={isInWishlist ? "default" : "ghost"} 
+              <Button
+                variant={isInWishlist ? "default" : "ghost"}
                 size="icon"
                 onClick={toggleWishlist}
               >
@@ -310,8 +311,8 @@ export default function ProductDetailPage() {
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Stock:</span>
                 <span className={product.stockQuantity > 0 ? 'text-green-600' : 'text-red-600'}>
-                  {product.stockQuantity > 0 
-                    ? `${product.stockQuantity} available` 
+                  {product.stockQuantity > 0
+                    ? `${product.stockQuantity} available`
                     : 'Out of stock'}
                 </span>
               </div>
@@ -376,11 +377,10 @@ export default function ProductDetailPage() {
                       type="button"
                     >
                       <Star
-                        className={`h-6 w-6 ${
-                          star <= newReview.rating
+                        className={`h-6 w-6 ${star <= newReview.rating
                             ? 'fill-yellow-400 text-yellow-400'
                             : 'text-muted-foreground'
-                        }`}
+                          }`}
                       />
                     </button>
                   ))}
@@ -413,11 +413,10 @@ export default function ProductDetailPage() {
                         {[...Array(5)].map((_, i) => (
                           <Star
                             key={i}
-                            className={`h-4 w-4 ${
-                              i < review.rating
+                            className={`h-4 w-4 ${i < review.rating
                                 ? 'fill-yellow-400 text-yellow-400'
                                 : 'text-muted-foreground'
-                            }`}
+                              }`}
                           />
                         ))}
                       </div>

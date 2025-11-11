@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, Clock, CheckCircle, XCircle, Truck } from 'lucide-react';
+import { Package, Clock, CheckCircle, XCircle, Truck, CreditCard } from 'lucide-react';
 
 interface OrderItem {
   _id: string;
@@ -100,6 +100,39 @@ export default function OrdersPage() {
     }
   };
 
+  const getPaymentStatusBadge = (paymentStatus: string) => {
+    switch (paymentStatus) {
+      case 'approved':
+        return (
+          <Badge variant="default" className="bg-green-500">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Payment Approved
+          </Badge>
+        );
+      case 'paid':
+        return (
+          <Badge variant="default" className="bg-blue-500">
+            <CreditCard className="h-3 w-3 mr-1" />
+            Paid
+          </Badge>
+        );
+      case 'pending':
+        return (
+          <Badge variant="secondary">
+            <Clock className="h-3 w-3 mr-1" />
+            Payment Pending
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="secondary">
+            <Clock className="h-3 w-3 mr-1" />
+            Payment Pending
+          </Badge>
+        );
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -145,16 +178,12 @@ export default function OrdersPage() {
                         })}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant={getStatusVariant(order.status)}>
                         {getStatusIcon(order.status)}
                         <span className="ml-1 capitalize">{order.status}</span>
                       </Badge>
-                      {order.paymentStatus && (
-                        <Badge variant={order.paymentStatus === 'paid' ? 'default' : 'secondary'}>
-                          {order.paymentStatus === 'paid' ? '✓ Paid' : 'Payment Pending'}
-                        </Badge>
-                      )}
+                      {getPaymentStatusBadge(order.paymentStatus)}
                     </div>
                   </div>
                 </CardHeader>

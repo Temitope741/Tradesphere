@@ -1,70 +1,58 @@
 // controllers/vendor.controller.js
-const Product = require('../models/Product.model');
 const Order = require('../models/Order.model');
+const Product = require('../models/Product.model');
 const ApiResponse = require('../utils/ApiResponse');
 
-// @desc    Get vendor dashboard stats
+// @desc    Get vendor dashboard statistics
 // @route   GET /api/vendor/dashboard
 // @access  Private (Vendor only)
 exports.getDashboardStats = async (req, res, next) => {
   try {
-    // Total products
-    const totalProducts = await Product.countDocuments({
-      vendor: req.user._id,
-      isActive: true
+    const vendorId = req.user._id;
+
+    // Get total products
+    const totalProducts = await Product.countDocuments({ 
+      vendor: vendorId 
     });
 
-    // Total orders
-    const totalOrders = await Order.countDocuments({
-      vendor: req.user._id
+    // Get active products
+    const activeProducts = await Product.countDocuments({ 
+      vendor: vendorId, 
+      isActive: true 
     });
 
-    // Pending orders
-    const pendingOrders = await Order.countDocuments({
-      vendor: req.user._id,
-      status: 'pending'
+    // Get total orders
+    const totalOrders = await Order.countDocuments({ 
+      vendor: vendorId 
     });
 
-    // Total revenue
-    const revenueResult = await Order.aggregate([
-      {
-        $match: {
-          vendor: req.user._id,
-          paymentStatus: 'paid'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$totalAmount' }
-        }
-      }
+    // Get pending orders
+    const pendingOrders = await Order.countDocuments({ 
+      vendor: vendorId, 
+      status: 'pending' 
+    });
+
+    // Calculate total revenue
+    const revenueData = await Order.aggregate([
+      { $match: { vendor: vendorId, paymentStatus: { $in: ['paid', 'approved'] } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
+    const totalRevenue = revenueData.length > 0 ? revenueData[0].total : 0;
 
-    const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
-
-    // Recent orders
-    const recentOrders = await Order.find({ vendor: req.user._id })
+    // Get recent orders
+    const recentOrders = await Order.find({ vendor: vendorId })
       .populate('customer', 'fullName email')
+      .populate('items.product', 'name')
       .sort({ createdAt: -1 })
-      .limit(5);
-
-    // Low stock products
-    const lowStockProducts = await Product.find({
-      vendor: req.user._id,
-      isActive: true,
-      stockQuantity: { $lt: 10, $gt: 0 }
-    })
-      .sort({ stockQuantity: 1 })
       .limit(5);
 
     const stats = {
       totalProducts,
+      activeProducts,
       totalOrders,
       pendingOrders,
       totalRevenue,
-      recentOrders,
-      lowStockProducts
+      recentOrders
     };
 
     ApiResponse.success(res, stats);
@@ -78,46 +66,76 @@ exports.getDashboardStats = async (req, res, next) => {
 // @access  Private (Vendor only)
 exports.getVendorProducts = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
+    const { page = 1, limit = 10, search, category, status } = req.query;
 
-    const total = await Product.countDocuments({ vendor: req.user._id });
+    const query = { vendor: req.user._id };
 
-    const products = await Product.find({ vendor: req.user._id })
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (category) {
+      query.category = category;
+    }
+
+    if (status) {
+      query.isActive = status === 'active';
+    }
+
+    const products = await Product.find(query)
       .populate('category', 'name')
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
 
-    ApiResponse.paginated(res, products, Number(page), Number(limit), total);
+    const total = await Product.countDocuments(query);
+
+    ApiResponse.success(res, {
+      products,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      total
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Get vendor orders
+// @desc    Get vendor orders with customer details
 // @route   GET /api/vendor/orders
 // @access  Private (Vendor only)
 exports.getVendorOrders = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
-    const skip = (page - 1) * limit;
+    const { page = 1, limit = 20, status, paymentStatus } = req.query;
 
     const query = { vendor: req.user._id };
+
     if (status) {
       query.status = status;
     }
 
-    const total = await Order.countDocuments(query);
+    if (paymentStatus) {
+      query.paymentStatus = paymentStatus;
+    }
 
     const orders = await Order.find(query)
       .populate('customer', 'fullName email phone')
       .populate('items.product', 'name imageUrl')
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
 
-    ApiResponse.paginated(res, orders, Number(page), Number(limit), total);
+    const total = await Order.countDocuments(query);
+
+    ApiResponse.success(res, {
+      data: orders,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+      total
+    });
   } catch (error) {
     next(error);
   }
