@@ -288,6 +288,15 @@ export default function VendorOrdersPage() {
                             minute: '2-digit',
                           })}
                         </p>
+                        {/* Show Reference Preview */}
+                        {order.paymentReference && (
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="font-mono text-xs">
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              Ref: {order.paymentReference}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={getStatusVariant(order.status)}>
@@ -366,9 +375,16 @@ export default function VendorOrdersPage() {
                       </div>
                       
                       {order.paymentReference && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Payment Reference:</span>
-                          <span className="font-mono text-sm">{order.paymentReference}</span>
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground font-medium">Customer Transfer Reference:</span>
+                            <span className="font-mono font-semibold text-blue-700">{order.paymentReference}</span>
+                          </div>
+                          {order.paymentMethod === 'bank_transfer' && order.paymentStatus === 'pending' && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              ⚠️ Please verify this reference before approving payment
+                            </p>
+                          )}
                         </div>
                       )}
 

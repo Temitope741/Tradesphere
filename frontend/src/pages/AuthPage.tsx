@@ -84,6 +84,9 @@ export default function AuthPage() {
       });
 
       if (response.success && response.user) {
+        // ✅ DISPATCH AUTH CHANGE EVENT - TRIGGERS HEADER UPDATE
+        window.dispatchEvent(new Event('auth-change'));
+        
         toast({
           title: "Welcome back!",
           description: "You have successfully signed in.",
@@ -125,9 +128,12 @@ export default function AuthPage() {
       });
 
       if (response.success && response.user) {
+        // ✅ DISPATCH AUTH CHANGE EVENT - TRIGGERS HEADER UPDATE
+        window.dispatchEvent(new Event('auth-change'));
+        
         toast({
           title: "Account created successfully!",
-          description: "Welcome to MarketPlace. You can now start shopping or selling.",
+          description: "Welcome to TradeSphere. You can now start shopping or selling.",
         });
 
         // Redirect based on role
@@ -156,7 +162,7 @@ export default function AuthPage() {
         <CardHeader className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-2">
             <Package className="h-8 w-8 text-primary" />
-            <span className="font-bold text-2xl">MarketPlace</span>
+            <span className="font-bold text-2xl">TradeSphere</span>
           </div>
           <div>
             <CardTitle className="text-2xl">

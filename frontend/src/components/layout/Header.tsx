@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -41,10 +41,11 @@ export const Header = ({ cartItemCount = 0 }: HeaderProps) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ DETECT ROUTE CHANGES
   const { toast } = useToast();
 
+  // ✅ FIX: REFETCH USER ON ROUTE CHANGES (AFTER LOGIN/REGISTER)
   useEffect(() => {
-    // Get current user
     const getCurrentUser = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -53,16 +54,46 @@ export const Header = ({ cartItemCount = 0 }: HeaderProps) => {
           if (response.success) {
             setUser(response.data);
           }
+        } else {
+          setUser(null); // Clear user if no token
         }
       } catch (error) {
         console.error('Error fetching user:', error);
         // Clear invalid token
         localStorage.removeItem('token');
         api.setToken(null);
+        setUser(null);
       }
     };
 
     getCurrentUser();
+  }, [location.pathname]); // ✅ RE-RUN WHEN ROUTE CHANGES
+
+  // ✅ ALSO LISTEN FOR CUSTOM AUTH EVENTS
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        api.getCurrentUser()
+          .then(response => {
+            if (response.success) {
+              setUser(response.data);
+            }
+          })
+          .catch(() => {
+            setUser(null);
+          });
+      } else {
+        setUser(null);
+      }
+    };
+
+    // ✅ LISTEN FOR LOGIN/LOGOUT EVENTS
+    window.addEventListener('auth-change', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange);
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -70,6 +101,10 @@ export const Header = ({ cartItemCount = 0 }: HeaderProps) => {
       await api.logout();
       setUser(null);
       setMobileMenuOpen(false);
+      
+      // ✅ DISPATCH AUTH CHANGE EVENT
+      window.dispatchEvent(new Event('auth-change'));
+      
       toast({
         title: "Signed out successfully",
         description: "You have been logged out of your account.",
@@ -107,7 +142,7 @@ export const Header = ({ cartItemCount = 0 }: HeaderProps) => {
             className="flex items-center space-x-2 font-bold text-lg sm:text-xl text-primary hover:opacity-80 transition-opacity flex-shrink-0"
           >
             <Package className="h-6 w-6 sm:h-8 sm:w-8" />
-            <span className=" xs:inline">TradeSphere</span>
+            <span className="xs:inline">TradeSphere</span>
           </Link>
 
           {/* Desktop Search Bar */}

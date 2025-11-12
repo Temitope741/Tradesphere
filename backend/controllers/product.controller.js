@@ -6,9 +6,11 @@ const Product = require('../models/Product.model');
 // @access  Public
 exports.getAllProducts = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search, category, minPrice, maxPrice, rating } = req.query;
+    console.time('Products Query'); // ✅ TRACK PERFORMANCE
+    
+    const { page = 1, limit = 12, search, category, minPrice, maxPrice, rating } = req.query;
 
-    let filter = {};
+    let filter = { isActive: true }; // ✅ ONLY SHOW ACTIVE PRODUCTS
 
     // Search filter
     if (search) {
@@ -32,19 +34,27 @@ exports.getAllProducts = async (req, res, next) => {
 
     // Rating filter
     if (rating) {
-      filter.averageRating = { $gte: Number(rating) };
+    filter.averageRating = { $gte: Number(rating) };
+
     }
 
     const skip = (Number(page) - 1) * Number(limit);
 
+    // ✅ OPTIMIZED QUERY - ONLY SELECT NEEDED FIELDS + USE .lean()
     const products = await Product.find(filter)
-      .populate('category', 'name')
-      .populate('vendor', 'fullName email')
+      .select('name price imageUrl category vendor averageRating totalReviews stockQuantity') // ✅ ONLY NEEDED FIELDS
+      .populate('category', 'name slug')
+      .populate('vendor', 'fullName')
+      .lean() // ✅ FASTER QUERIES - RETURNS PLAIN JS OBJECTS
       .skip(skip)
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .maxTimeMS(5000); // ✅ TIMEOUT AFTER 5 SECONDS
 
+    // ✅ RUN COUNT IN PARALLEL WITH QUERY (IF NEEDED FOR PAGINATION)
     const totalProducts = await Product.countDocuments(filter);
+
+    console.timeEnd('Products Query'); // ✅ LOG QUERY TIME
 
     res.status(200).json({
       success: true,
@@ -55,6 +65,7 @@ exports.getAllProducts = async (req, res, next) => {
       data: products
     });
   } catch (error) {
+    console.error('Products query error:', error);
     next(error);
   }
 };
@@ -64,10 +75,18 @@ exports.getAllProducts = async (req, res, next) => {
 // @access  Public
 exports.getProductById = async (req, res, next) => {
   try {
+    console.time('Single Product Query');
+    
     const product = await Product.findById(req.params.id)
-      .populate('category', 'name')
+      .populate('category', 'name slug')
       .populate('vendor', 'fullName email phone')
-      .populate('reviews');
+      .populate({
+        path: 'reviews',
+        select: 'rating comment user createdAt',
+        populate: { path: 'user', select: 'fullName' },
+        options: { limit: 10, sort: { createdAt: -1 } } // ✅ LIMIT REVIEWS
+      })
+      .lean();
 
     if (!product) {
       return res.status(404).json({
@@ -76,11 +95,14 @@ exports.getProductById = async (req, res, next) => {
       });
     }
 
+    console.timeEnd('Single Product Query');
+
     res.status(200).json({
       success: true,
       data: product
     });
   } catch (error) {
+    console.error('Single product query error:', error);
     next(error);
   }
 };
@@ -101,7 +123,11 @@ exports.createProduct = async (req, res, next) => {
     }
 
     // Check if product already exists
-    const existingProduct = await Product.findOne({ name, vendor: req.user.id });
+    const existingProduct = await Product.findOne({ 
+      name, 
+      vendor: req.user.id 
+    }).lean();
+    
     if (existingProduct) {
       return res.status(400).json({
         success: false,
@@ -136,7 +162,7 @@ exports.createProduct = async (req, res, next) => {
 // @access  Private (Vendor owner only)
 exports.updateProduct = async (req, res, next) => {
   try {
-    let product = await Product.findById(req.params.id);
+    let product = await Product.findById(req.params.id).lean();
 
     if (!product) {
       return res.status(404).json({
@@ -154,7 +180,7 @@ exports.updateProduct = async (req, res, next) => {
     }
 
     // Update allowed fields
-    const allowedUpdates = ['name', 'description', 'price', 'stock', 'image', 'specifications', 'isActive'];
+    const allowedUpdates = ['name', 'description', 'price', 'stockQuantity', 'imageUrl', 'images', 'isActive'];
     const updates = {};
 
     allowedUpdates.forEach(field => {
@@ -163,10 +189,14 @@ exports.updateProduct = async (req, res, next) => {
       }
     });
 
-    product = await Product.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-      runValidators: true
-    });
+    product = await Product.findByIdAndUpdate(
+      req.params.id, 
+      updates, 
+      {
+        new: true,
+        runValidators: true
+      }
+    );
 
     res.status(200).json({
       success: true,
@@ -183,7 +213,7 @@ exports.updateProduct = async (req, res, next) => {
 // @access  Private (Vendor owner or Admin)
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).lean();
 
     if (!product) {
       return res.status(404).json({
@@ -217,16 +247,25 @@ exports.deleteProduct = async (req, res, next) => {
 // @access  Public
 exports.getProductsByCategory = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 12 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const products = await Product.find({ category: req.params.categoryId, isActive: true })
-      .populate('category', 'name')
+    const products = await Product.find({ 
+      category: req.params.categoryId, 
+      isActive: true 
+    })
+      .select('name price imageUrl category vendor averageRating stockQuantity')
+      .populate('category', 'name slug')
       .populate('vendor', 'fullName')
+      .lean()
       .skip(skip)
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
 
-    const total = await Product.countDocuments({ category: req.params.categoryId, isActive: true });
+    const total = await Product.countDocuments({ 
+      category: req.params.categoryId, 
+      isActive: true 
+    });
 
     res.status(200).json({
       success: true,
@@ -248,9 +287,11 @@ exports.getTopRatedProducts = async (req, res, next) => {
     const limit = req.query.limit || 10;
 
     const products = await Product.find({ isActive: true })
+      .select('name price imageUrl category vendor averageRating')
       .populate('category', 'name')
       .populate('vendor', 'fullName')
-      .sort({ averageRating: -1 })
+      .lean()
+      .sort({ averageRating: -1, totalReviews: -1 })
       .limit(Number(limit));
 
     res.status(200).json({

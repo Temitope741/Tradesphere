@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Star, ShoppingCart, TrendingUp, Users, Package, ArrowRight } from 'lucide-react';
 import api from '@/services/api';
 import heroImage from '@/assets/hero-ecommerce.jpg';
@@ -29,52 +30,89 @@ interface Category {
   description: string;
 }
 
+// ✅ IMAGE OPTIMIZATION UTILITY
+const optimizeImage = (url: string, width = 400, height = 400) => {
+  if (!url || !url.includes('cloudinary')) return url;
+  return url.replace(
+    '/upload/',
+    `/upload/w_${width},h_${height},c_fill,q_auto,f_auto,dpr_auto/`
+  );
+};
+
+// ✅ SKELETON LOADERS
+const ProductSkeleton = () => (
+  <Card className="overflow-hidden">
+    <Skeleton className="aspect-square w-full" />
+    <CardContent className="p-4 space-y-3">
+      <Skeleton className="h-4 w-20" />
+      <Skeleton className="h-5 w-full" />
+      <Skeleton className="h-4 w-full" />
+      <div className="flex justify-between items-center">
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-4 w-12" />
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const CategorySkeleton = () => (
+  <Card className="text-center p-6">
+    <CardContent className="space-y-3">
+      <Skeleton className="w-12 h-12 rounded-full mx-auto" />
+      <Skeleton className="h-4 w-20 mx-auto" />
+    </CardContent>
+  </Card>
+);
+
 export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    // ✅ FETCH DATA IN PARALLEL, NOT SEQUENTIALLY
+    const fetchProducts = async () => {
       try {
-        // Fetch featured products
-        const productsResponse = await api.getProducts({ limit: 8 });
-        if (productsResponse.success) {
-          setFeaturedProducts(productsResponse.data);
-        }
-
-        // Fetch categories
-        const categoriesResponse = await api.getCategories();
-        if (categoriesResponse.success) {
-          setCategories(categoriesResponse.data.slice(0, 6)); // Limit to 6 categories
+        const response = await api.getProducts({ limit: 8 });
+        if (response.success) {
+          setFeaturedProducts(response.data);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching products:', error);
       } finally {
-        setIsLoading(false);
+        setProductsLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    const fetchCategories = async () => {
+      try {
+        const response = await api.getCategories();
+        if (response.success) {
+          setCategories(response.data.slice(0, 6));
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+    // ✅ PARALLEL FETCHING - BOTH RUN AT THE SAME TIME
+    fetchProducts();
+    fetchCategories();
+  }, []);
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* Hero Section - LOADS IMMEDIATELY */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden bg-gradient-hero">
         <div className="absolute inset-0 z-0">
           <img 
             src={heroImage} 
             alt="E-commerce Hero" 
             className="w-full h-full object-cover opacity-20"
+            loading="eager" // ✅ LOAD HERO IMAGE FIRST
           />
         </div>
         
@@ -109,7 +147,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Features Section - STATIC CONTENT, NO LOADING */}
       <section className="py-20 bg-gradient-subtle">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -159,7 +197,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Categories Section - SHOWS SKELETONS WHILE LOADING */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -170,27 +208,34 @@ export default function HomePage() {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {categories.map((category) => (
-              <Link 
-                key={category._id} 
-                to={`/shop?category=${category.slug}`}
-                className="group"
-              >
-                <Card className="text-center p-6 hover:shadow-card transition-all duration-300 transform hover:scale-105 cursor-pointer">
-                  <CardContent className="space-y-3">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto group-hover:bg-primary/20 transition-colors">
-                      <Package className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="font-semibold text-sm">{category.name}</h3>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+            {categoriesLoading ? (
+              // ✅ SHOW SKELETONS WHILE LOADING
+              Array.from({ length: 6 }).map((_, i) => (
+                <CategorySkeleton key={i} />
+              ))
+            ) : (
+              categories.map((category) => (
+                <Link 
+                  key={category._id} 
+                  to={`/shop?category=${category.slug}`}
+                  className="group"
+                >
+                  <Card className="text-center p-6 hover:shadow-card transition-all duration-300 transform hover:scale-105 cursor-pointer">
+                    <CardContent className="space-y-3">
+                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto group-hover:bg-primary/20 transition-colors">
+                        <Package className="h-6 w-6 text-primary" />
+                      </div>
+                      <h3 className="font-semibold text-sm">{category.name}</h3>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      {/* Featured Products */}
+      {/* Featured Products - SHOWS SKELETONS WHILE LOADING */}
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center mb-16">
@@ -208,56 +253,65 @@ export default function HomePage() {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) => (
-              <Card key={product._id} className="group hover:shadow-card transition-all duration-300 overflow-hidden">
-                <div className="aspect-square overflow-hidden">
-                  <img 
-                    src={product.imageUrl || '/placeholder.svg'} 
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                <CardContent className="p-4 space-y-3">
-                  <div className="space-y-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {product.category?.name}
-                    </Badge>
-                    <h3 className="font-semibold line-clamp-2">{product.name}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {product.description}
-                    </p>
+            {productsLoading ? (
+              // ✅ SHOW SKELETONS WHILE LOADING
+              Array.from({ length: 8 }).map((_, i) => (
+                <ProductSkeleton key={i} />
+              ))
+            ) : (
+              featuredProducts.map((product) => (
+                <Card key={product._id} className="group hover:shadow-card transition-all duration-300 overflow-hidden">
+                  <div className="aspect-square overflow-hidden bg-muted">
+                    <img 
+                      src={optimizeImage(product.imageUrl, 400, 400) || '/placeholder.svg'} 
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy" // ✅ LAZY LOAD IMAGES
+                      decoding="async" // ✅ ASYNC DECODE
+                    />
                   </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold text-primary">
-                      ₦{product.price}
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm text-muted-foreground">
-                        {product.averageRating || 0}
-                      </span>
+                  <CardContent className="p-4 space-y-3">
+                    <div className="space-y-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {product.category?.name}
+                      </Badge>
+                      <h3 className="font-semibold line-clamp-2">{product.name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {product.description}
+                      </p>
                     </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-sm text-muted-foreground">
-                      by {product.vendor?.fullName}
-                    </span>
-                    <Button size="sm" variant="outline" asChild>
-                      <Link to={`/product/${product._id}`}>
-                        View
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-2xl font-bold text-primary">
+                        ₦{product.price.toLocaleString()}
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm text-muted-foreground">
+                          {product.averageRating || 0}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-sm text-muted-foreground truncate">
+                        by {product.vendor?.fullName}
+                      </span>
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/product/${product._id}`}>
+                          View
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section - STATIC CONTENT, NO LOADING */}
       <section className="py-20 bg-gradient-primary text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-4xl font-bold mb-6">Ready to Start Selling?</h2>
